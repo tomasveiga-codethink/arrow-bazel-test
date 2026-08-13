@@ -1,0 +1,23 @@
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+package(default_visibility = ["//visibility:public"])
+licenses(["notice"])  # BSD 3-Clause
+
+exports_files(["LICENSE"])
+
+cc_library(
+    name = "xsimd",
+    hdrs = glob(
+        [
+            "include/xsimd/*.hpp",
+            "include/xsimd/arch/**/*.hpp",
+            "include/xsimd/config/*.hpp",
+            "include/xsimd/math/*.hpp",
+            "include/xsimd/memory/*.hpp",
+            "include/xsimd/types/*.hpp",
+            "include/xsimd/utils/*.hpp",
+        ],
+    ),
+    includes = ["include"],
+    visibility = ["//visibility:public"],
+)
+

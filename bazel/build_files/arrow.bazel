@@ -1,0 +1,1144 @@
+"""Bazel build for Apache Arrow C++ core and IPC.
+
+The explicit source groups below mirror cpp/src/arrow/CMakeLists.txt in Arrow
+25.0.0. Keep them explicit: a recursive source glob would accidentally compile
+tests, fuzzers, binaries, optional components, and ISA-specific translation
+units without their required flags.
+
+Enabled components: core, IPC/Feather, CSV, JSON, local/HDFS filesystems,
+all BCR-backed compression codecs and allocators, full Compute, Acero, Dataset,
+Parquet, Flight, and Flight SQL. See the README for intentionally omitted parts.
+"""
+
+load("@flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
+load("@grpc//bazel:generate_cc.bzl", "generate_cc")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])  # Apache-2.0
+
+exports_files([
+    "LICENSE.txt",
+    "NOTICE.txt",
+])
+
+proto_library(
+    name = "flight_proto",
+    srcs = ["format/Flight.proto"],
+    deps = ["@protobuf//:timestamp_proto"],
+)
+
+cc_proto_library(
+    name = "flight_cc_proto",
+    deps = [":flight_proto"],
+)
+
+genrule(
+    name = "arrow_util_config",
+    srcs = ["cpp/src/arrow/util/config.h.cmake"],
+    outs = ["cpp/src/arrow/util/config.h"],
+    cmd = ("sed " +
+           "-e 's/@ARROW_VERSION_MAJOR@/25/g' " +
+           "-e 's/@ARROW_VERSION_MINOR@/0/g' " +
+           "-e 's/@ARROW_VERSION_PATCH@/1/g' " +
+           "-e 's/cmakedefine ARROW_USE_NATIVE_INT128/undef ARROW_USE_NATIVE_INT128/g' " +
+           "-e 's/cmakedefine/define/g' " +
+           "$< >$@"),
+)
+
+genrule(
+    name = "arrow_util_config_internal",
+    srcs = ["cpp/src/arrow/util/config_internal.h.cmake"],
+    outs = ["cpp/src/arrow/util/config_internal.h"],
+    cmd = "cp $< $@",
+)
+
+genrule(
+    name = "parquet_version_h",
+    srcs = ["cpp/src/parquet/parquet_version.h.in"],
+    outs = ["cpp/src/parquet/parquet_version.h"],
+    cmd = ("sed " +
+           "-e 's/@PARQUET_VERSION_MAJOR@/25/g' " +
+           "-e 's/@PARQUET_VERSION_MINOR@/0/g' " +
+           "-e 's/@PARQUET_VERSION_PATCH@/0/g' " +
+           "$< >$@"),
+)
+
+# Arrow includes these generated .cc files after defining serialization and
+# export customizations, so keep the codegen outputs textual instead of using a
+# normally compiled cc_grpc_library.
+generate_cc(
+    name = "flight_grpc_codegen",
+    srcs = [":flight_proto"],
+    plugin = "@grpc//src/compiler:grpc_cpp_plugin",
+    well_known_protos = False,
+)
+
+proto_library(
+    name = "flight_sql_proto",
+    srcs = ["format/FlightSql.proto"],
+    deps = ["@protobuf//:descriptor_proto"],
+)
+
+generate_cc(
+    name = "flight_sql_codegen",
+    srcs = [":flight_sql_proto"],
+    flags = ["dllexport_decl=ARROW_FLIGHT_SQL_EXPORT"],
+    well_known_protos = False,
+)
+
+flatbuffer_cc_library(
+    name = "arrow_flatbuffers",
+    srcs = [
+        "cpp/src/arrow/ipc/feather.fbs",
+        "format/File.fbs",
+        "format/Message.fbs",
+        "format/Schema.fbs",
+        "format/SparseTensor.fbs",
+        "format/Tensor.fbs",
+    ],
+    cc_include_paths = [
+        "cpp/src",
+        "cpp/src/generated",
+    ],
+    flatc_args = [
+        "--cpp-std",
+        "c++11",
+    ],
+    include_paths = [
+        "cpp/src/arrow/ipc",
+        "format",
+    ],
+    out_prefix = "cpp/src/generated/",
+    visibility = ["//visibility:private"],
+)
+
+genrule(
+    name = "flight_pb",
+    outs = ["cpp/src/arrow/flight/Flight.pb.h"],
+    cmd = """echo '#include "arrow/format/Flight.pb.h"' > $@""",
+)
+
+genrule(
+    name = "flight_grpc_h",
+    outs = ["cpp/src/arrow/flight/Flight.grpc.pb.h"],
+    cmd = """echo '#include "arrow/format/Flight.grpc.pb.h"' > $@""",
+)
+
+genrule(
+    name = "flight_grpc_cc",
+    outs = ["cpp/src/arrow/flight/Flight.grpc.pb.cc"],
+    cmd = """echo '#include "arrow/format/Flight.grpc.pb.cc"' > $@""",
+)
+
+genrule(
+    name = "flight_sql_cc",
+    outs = ["cpp/src/arrow/flight/sql/FlightSql.pb.cc"],
+    cmd = """echo '#include "arrow/format/FlightSql.pb.cc"' > $@""",
+)
+
+genrule(
+    name = "flight_sql_h",
+    outs = ["cpp/src/arrow/flight/sql/FlightSql.pb.h"],
+    cmd = """echo '#include "arrow/format/FlightSql.pb.h"' > $@""",
+)
+
+_ARROW_SRCS = [
+    "cpp/src/arrow/buffer.cc",
+    "cpp/src/arrow/builder.cc",
+    "cpp/src/arrow/c/bridge.cc",
+    "cpp/src/arrow/c/dlpack.cc",
+    "cpp/src/arrow/chunk_resolver.cc",
+    "cpp/src/arrow/chunked_array.cc",
+    "cpp/src/arrow/compare.cc",
+    "cpp/src/arrow/config.cc",
+    "cpp/src/arrow/datum.cc",
+    "cpp/src/arrow/device.cc",
+    "cpp/src/arrow/device_allocation_type_set.cc",
+    "cpp/src/arrow/extension/bool8.cc",
+    "cpp/src/arrow/extension/json.cc",
+    "cpp/src/arrow/extension/parquet_variant.cc",
+    "cpp/src/arrow/extension/uuid.cc",
+    "cpp/src/arrow/extension_type.cc",
+    "cpp/src/arrow/pretty_print.cc",
+    "cpp/src/arrow/record_batch.cc",
+    "cpp/src/arrow/result.cc",
+    "cpp/src/arrow/scalar.cc",
+    "cpp/src/arrow/sparse_tensor.cc",
+    "cpp/src/arrow/status.cc",
+    "cpp/src/arrow/table.cc",
+    "cpp/src/arrow/table_builder.cc",
+    "cpp/src/arrow/tensor.cc",
+    "cpp/src/arrow/tensor/coo_converter.cc",
+    "cpp/src/arrow/tensor/csf_converter.cc",
+    "cpp/src/arrow/tensor/csx_converter.cc",
+    "cpp/src/arrow/type.cc",
+    "cpp/src/arrow/type_traits.cc",
+    "cpp/src/arrow/visitor.cc",
+]
+
+_ARROW_ARRAY_SRCS = [
+    "cpp/src/arrow/array/array_base.cc",
+    "cpp/src/arrow/array/array_binary.cc",
+    "cpp/src/arrow/array/array_decimal.cc",
+    "cpp/src/arrow/array/array_dict.cc",
+    "cpp/src/arrow/array/array_nested.cc",
+    "cpp/src/arrow/array/array_primitive.cc",
+    "cpp/src/arrow/array/array_run_end.cc",
+    "cpp/src/arrow/array/builder_adaptive.cc",
+    "cpp/src/arrow/array/builder_base.cc",
+    "cpp/src/arrow/array/builder_binary.cc",
+    "cpp/src/arrow/array/builder_decimal.cc",
+    "cpp/src/arrow/array/builder_dict.cc",
+    "cpp/src/arrow/array/builder_nested.cc",
+    "cpp/src/arrow/array/builder_primitive.cc",
+    "cpp/src/arrow/array/builder_run_end.cc",
+    "cpp/src/arrow/array/builder_union.cc",
+    "cpp/src/arrow/array/concatenate.cc",
+    "cpp/src/arrow/array/data.cc",
+    "cpp/src/arrow/array/diff.cc",
+    "cpp/src/arrow/array/statistics.cc",
+    "cpp/src/arrow/array/util.cc",
+    "cpp/src/arrow/array/validate.cc",
+]
+
+_ARROW_IO_SRCS = [
+    "cpp/src/arrow/io/buffered.cc",
+    "cpp/src/arrow/io/caching.cc",
+    "cpp/src/arrow/io/compressed.cc",
+    "cpp/src/arrow/io/file.cc",
+    "cpp/src/arrow/io/hdfs.cc",
+    "cpp/src/arrow/io/hdfs_internal.cc",
+    "cpp/src/arrow/io/interfaces.cc",
+    "cpp/src/arrow/io/memory.cc",
+    "cpp/src/arrow/io/slow.cc",
+    "cpp/src/arrow/io/stdio.cc",
+    "cpp/src/arrow/io/transform.cc",
+]
+
+_ARROW_CSV_SRCS = [
+    "cpp/src/arrow/csv/chunker.cc",
+    "cpp/src/arrow/csv/column_builder.cc",
+    "cpp/src/arrow/csv/column_decoder.cc",
+    "cpp/src/arrow/csv/converter.cc",
+    "cpp/src/arrow/csv/options.cc",
+    "cpp/src/arrow/csv/parser.cc",
+    "cpp/src/arrow/csv/reader.cc",
+    "cpp/src/arrow/csv/writer.cc",
+]
+
+_ARROW_FILESYSTEM_SRCS = [
+    "cpp/src/arrow/filesystem/filesystem.cc",
+    "cpp/src/arrow/filesystem/hdfs.cc",
+    "cpp/src/arrow/filesystem/localfs.cc",
+    "cpp/src/arrow/filesystem/mockfs.cc",
+    "cpp/src/arrow/filesystem/path_util.cc",
+    "cpp/src/arrow/filesystem/util_internal.cc",
+]
+
+_ARROW_JSON_SRCS = [
+    "cpp/src/arrow/extension/fixed_shape_tensor.cc",
+    "cpp/src/arrow/extension/opaque.cc",
+    "cpp/src/arrow/extension/tensor_internal.cc",
+    "cpp/src/arrow/extension/variable_shape_tensor.cc",
+    "cpp/src/arrow/json/chunked_builder.cc",
+    "cpp/src/arrow/json/chunker.cc",
+    "cpp/src/arrow/json/converter.cc",
+    "cpp/src/arrow/json/from_string.cc",
+    "cpp/src/arrow/json/object_parser.cc",
+    "cpp/src/arrow/json/options.cc",
+    "cpp/src/arrow/json/parser.cc",
+    "cpp/src/arrow/json/reader.cc",
+]
+
+_ARROW_VENDORED_SRCS = [
+    "cpp/src/arrow/vendored/base64.cpp",
+    "cpp/src/arrow/vendored/datetime.cpp",
+    "cpp/src/arrow/vendored/double-conversion/bignum-dtoa.cc",
+    "cpp/src/arrow/vendored/double-conversion/bignum.cc",
+    "cpp/src/arrow/vendored/double-conversion/cached-powers.cc",
+    "cpp/src/arrow/vendored/double-conversion/double-to-string.cc",
+    "cpp/src/arrow/vendored/double-conversion/fast-dtoa.cc",
+    "cpp/src/arrow/vendored/double-conversion/fixed-dtoa.cc",
+    "cpp/src/arrow/vendored/double-conversion/string-to-double.cc",
+    "cpp/src/arrow/vendored/double-conversion/strtod.cc",
+    "cpp/src/arrow/vendored/musl/strptime.c",
+    "cpp/src/arrow/vendored/uriparser/UriCommon.c",
+    "cpp/src/arrow/vendored/uriparser/UriCompare.c",
+    "cpp/src/arrow/vendored/uriparser/UriEscape.c",
+    "cpp/src/arrow/vendored/uriparser/UriFile.c",
+    "cpp/src/arrow/vendored/uriparser/UriIp4.c",
+    "cpp/src/arrow/vendored/uriparser/UriIp4Base.c",
+    "cpp/src/arrow/vendored/uriparser/UriMemory.c",
+    "cpp/src/arrow/vendored/uriparser/UriNormalize.c",
+    "cpp/src/arrow/vendored/uriparser/UriNormalizeBase.c",
+    "cpp/src/arrow/vendored/uriparser/UriParse.c",
+    "cpp/src/arrow/vendored/uriparser/UriParseBase.c",
+    "cpp/src/arrow/vendored/uriparser/UriQuery.c",
+    "cpp/src/arrow/vendored/uriparser/UriRecompose.c",
+    "cpp/src/arrow/vendored/uriparser/UriResolve.c",
+    "cpp/src/arrow/vendored/uriparser/UriShorten.c",
+]
+
+_ARROW_UTIL_SRCS = [
+    "cpp/src/arrow/util/align_util.cc",
+    "cpp/src/arrow/util/async_util.cc",
+    "cpp/src/arrow/util/atfork_internal.cc",
+    "cpp/src/arrow/util/basic_decimal.cc",
+    "cpp/src/arrow/util/bit_block_counter.cc",
+    "cpp/src/arrow/util/bit_run_reader.cc",
+    "cpp/src/arrow/util/bit_util.cc",
+    "cpp/src/arrow/util/bitmap.cc",
+    "cpp/src/arrow/util/bitmap_builders.cc",
+    "cpp/src/arrow/util/bitmap_ops.cc",
+    "cpp/src/arrow/util/bpacking.cc",
+    "cpp/src/arrow/util/bpacking_scalar.cc",
+    "cpp/src/arrow/util/bpacking_simd_128.cc",
+    "cpp/src/arrow/util/byte_size.cc",
+    "cpp/src/arrow/util/byte_stream_split_internal.cc",
+    "cpp/src/arrow/util/cancel.cc",
+    "cpp/src/arrow/util/compression.cc",
+    "cpp/src/arrow/util/compression_brotli.cc",
+    "cpp/src/arrow/util/compression_bz2.cc",
+    "cpp/src/arrow/util/compression_lz4.cc",
+    "cpp/src/arrow/util/compression_snappy.cc",
+    "cpp/src/arrow/util/compression_zlib.cc",
+    "cpp/src/arrow/util/compression_zstd.cc",
+    "cpp/src/arrow/util/counting_semaphore.cc",
+    "cpp/src/arrow/util/cpu_info.cc",
+    "cpp/src/arrow/util/crc32.cc",
+    "cpp/src/arrow/util/debug.cc",
+    "cpp/src/arrow/util/decimal.cc",
+    "cpp/src/arrow/util/delimiting.cc",
+    "cpp/src/arrow/util/dict_util.cc",
+    "cpp/src/arrow/util/fixed_width_internal.cc",
+    "cpp/src/arrow/util/float16.cc",
+    "cpp/src/arrow/util/formatting.cc",
+    "cpp/src/arrow/util/future.cc",
+    "cpp/src/arrow/util/fuzz_internal.cc",
+    "cpp/src/arrow/util/hashing.cc",
+    "cpp/src/arrow/util/int_util.cc",
+    "cpp/src/arrow/util/io_util.cc",
+    "cpp/src/arrow/util/key_value_metadata.cc",
+    "cpp/src/arrow/util/list_util.cc",
+    "cpp/src/arrow/util/logger.cc",
+    "cpp/src/arrow/util/logging.cc",
+    "cpp/src/arrow/util/math_internal.cc",
+    "cpp/src/arrow/util/memory.cc",
+    "cpp/src/arrow/util/mutex.cc",
+    "cpp/src/arrow/util/ree_util.cc",
+    "cpp/src/arrow/util/secure_string.cc",
+    "cpp/src/arrow/util/string.cc",
+    "cpp/src/arrow/util/string_util.cc",
+    "cpp/src/arrow/util/task_group.cc",
+    "cpp/src/arrow/util/tdigest.cc",
+    "cpp/src/arrow/util/thread_pool.cc",
+    "cpp/src/arrow/util/time.cc",
+    "cpp/src/arrow/util/tracing.cc",
+    "cpp/src/arrow/util/trie.cc",
+    "cpp/src/arrow/util/ulp_distance.cc",
+    "cpp/src/arrow/util/union_util.cc",
+    "cpp/src/arrow/util/unreachable.cc",
+    "cpp/src/arrow/util/uri.cc",
+    "cpp/src/arrow/util/utf8.cc",
+    "cpp/src/arrow/util/value_parsing.cc",
+]
+
+# Arrow core uses this baseline subset even when the optional full Compute
+# component is disabled.
+_ARROW_COMPUTE_CORE_SRCS = [
+    "cpp/src/arrow/compute/api_aggregate.cc",
+    "cpp/src/arrow/compute/api_scalar.cc",
+    "cpp/src/arrow/compute/api_vector.cc",
+    "cpp/src/arrow/compute/cast.cc",
+    "cpp/src/arrow/compute/exec.cc",
+    "cpp/src/arrow/compute/expression.cc",
+    "cpp/src/arrow/compute/function.cc",
+    "cpp/src/arrow/compute/function_internal.cc",
+    "cpp/src/arrow/compute/kernel.cc",
+    "cpp/src/arrow/compute/kernels/chunked_internal.cc",
+    "cpp/src/arrow/compute/kernels/codegen_internal.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_boolean.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_dictionary.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_extension.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_internal.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_nested.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_numeric.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_string.cc",
+    "cpp/src/arrow/compute/kernels/scalar_cast_temporal.cc",
+    "cpp/src/arrow/compute/kernels/temporal_internal.cc",
+    "cpp/src/arrow/compute/kernels/vector_hash.cc",
+    "cpp/src/arrow/compute/kernels/vector_selection.cc",
+    "cpp/src/arrow/compute/kernels/vector_selection_filter_internal.cc",
+    "cpp/src/arrow/compute/kernels/vector_selection_internal.cc",
+    "cpp/src/arrow/compute/kernels/vector_selection_take_internal.cc",
+    "cpp/src/arrow/compute/kernels/vector_swizzle.cc",
+    "cpp/src/arrow/compute/ordering.cc",
+    "cpp/src/arrow/compute/registry.cc",
+]
+
+_ARROW_COMPUTE_SRCS = [
+    "cpp/src/arrow/compute/initialize.cc",
+    "cpp/src/arrow/compute/kernels/aggregate_basic.cc",
+    "cpp/src/arrow/compute/kernels/aggregate_mode.cc",
+    "cpp/src/arrow/compute/kernels/aggregate_pivot.cc",
+    "cpp/src/arrow/compute/kernels/aggregate_quantile.cc",
+    "cpp/src/arrow/compute/kernels/aggregate_tdigest.cc",
+    "cpp/src/arrow/compute/kernels/aggregate_var_std.cc",
+    "cpp/src/arrow/compute/kernels/hash_aggregate.cc",
+    "cpp/src/arrow/compute/kernels/hash_aggregate_numeric.cc",
+    "cpp/src/arrow/compute/kernels/hash_aggregate_pivot.cc",
+    "cpp/src/arrow/compute/kernels/pivot_internal.cc",
+    "cpp/src/arrow/compute/kernels/ree_util_internal.cc",
+    "cpp/src/arrow/compute/kernels/scalar_arithmetic.cc",
+    "cpp/src/arrow/compute/kernels/scalar_boolean.cc",
+    "cpp/src/arrow/compute/kernels/scalar_compare.cc",
+    "cpp/src/arrow/compute/kernels/scalar_if_else.cc",
+    "cpp/src/arrow/compute/kernels/scalar_nested.cc",
+    "cpp/src/arrow/compute/kernels/scalar_random.cc",
+    "cpp/src/arrow/compute/kernels/scalar_round.cc",
+    "cpp/src/arrow/compute/kernels/scalar_set_lookup.cc",
+    "cpp/src/arrow/compute/kernels/scalar_string_ascii.cc",
+    "cpp/src/arrow/compute/kernels/scalar_string_utf8.cc",
+    "cpp/src/arrow/compute/kernels/scalar_temporal_binary.cc",
+    "cpp/src/arrow/compute/kernels/scalar_temporal_unary.cc",
+    "cpp/src/arrow/compute/kernels/scalar_validity.cc",
+    "cpp/src/arrow/compute/kernels/util_internal.cc",
+    "cpp/src/arrow/compute/kernels/vector_array_sort.cc",
+    "cpp/src/arrow/compute/kernels/vector_cumulative_ops.cc",
+    "cpp/src/arrow/compute/kernels/vector_nested.cc",
+    "cpp/src/arrow/compute/kernels/vector_pairwise.cc",
+    "cpp/src/arrow/compute/kernels/vector_rank.cc",
+    "cpp/src/arrow/compute/kernels/vector_replace.cc",
+    "cpp/src/arrow/compute/kernels/vector_run_end_encode.cc",
+    "cpp/src/arrow/compute/kernels/vector_select_k.cc",
+    "cpp/src/arrow/compute/kernels/vector_sort.cc",
+    "cpp/src/arrow/compute/kernels/vector_statistics.cc",
+    "cpp/src/arrow/compute/key_hash_internal.cc",
+    "cpp/src/arrow/compute/key_map_internal.cc",
+    "cpp/src/arrow/compute/light_array_internal.cc",
+    "cpp/src/arrow/compute/row/compare_internal.cc",
+    "cpp/src/arrow/compute/row/encode_internal.cc",
+    "cpp/src/arrow/compute/row/grouper.cc",
+    "cpp/src/arrow/compute/row/row_encoder_internal.cc",
+    "cpp/src/arrow/compute/row/row_internal.cc",
+    "cpp/src/arrow/compute/util.cc",
+    "cpp/src/arrow/compute/util_internal.cc",
+]
+
+_ARROW_ACERO_SRCS = [
+    "cpp/src/arrow/acero/accumulation_queue.cc",
+    "cpp/src/arrow/acero/aggregate_internal.cc",
+    "cpp/src/arrow/acero/asof_join_node.cc",
+    "cpp/src/arrow/acero/bloom_filter.cc",
+    "cpp/src/arrow/acero/exec_plan.cc",
+    "cpp/src/arrow/acero/fetch_node.cc",
+    "cpp/src/arrow/acero/filter_node.cc",
+    "cpp/src/arrow/acero/groupby_aggregate_node.cc",
+    "cpp/src/arrow/acero/hash_join.cc",
+    "cpp/src/arrow/acero/hash_join_dict.cc",
+    "cpp/src/arrow/acero/hash_join_node.cc",
+    "cpp/src/arrow/acero/map_node.cc",
+    "cpp/src/arrow/acero/options.cc",
+    "cpp/src/arrow/acero/order_by_impl.cc",
+    "cpp/src/arrow/acero/order_by_node.cc",
+    "cpp/src/arrow/acero/partition_util.cc",
+    "cpp/src/arrow/acero/pivot_longer_node.cc",
+    "cpp/src/arrow/acero/project_node.cc",
+    "cpp/src/arrow/acero/query_context.cc",
+    "cpp/src/arrow/acero/scalar_aggregate_node.cc",
+    "cpp/src/arrow/acero/sink_node.cc",
+    "cpp/src/arrow/acero/sorted_merge_node.cc",
+    "cpp/src/arrow/acero/source_node.cc",
+    "cpp/src/arrow/acero/swiss_join.cc",
+    "cpp/src/arrow/acero/task_util.cc",
+    "cpp/src/arrow/acero/time_series_util.cc",
+    "cpp/src/arrow/acero/tpch_node.cc",
+    "cpp/src/arrow/acero/union_node.cc",
+    "cpp/src/arrow/acero/util.cc",
+]
+
+_ARROW_DATASET_SRCS = [
+    "cpp/src/arrow/dataset/dataset.cc",
+    "cpp/src/arrow/dataset/dataset_writer.cc",
+    "cpp/src/arrow/dataset/discovery.cc",
+    "cpp/src/arrow/dataset/file_base.cc",
+    "cpp/src/arrow/dataset/file_csv.cc",
+    "cpp/src/arrow/dataset/file_ipc.cc",
+    "cpp/src/arrow/dataset/file_json.cc",
+    "cpp/src/arrow/dataset/file_parquet.cc",
+    "cpp/src/arrow/dataset/partition.cc",
+    "cpp/src/arrow/dataset/plan.cc",
+    "cpp/src/arrow/dataset/projector.cc",
+    "cpp/src/arrow/dataset/scan_node.cc",
+    "cpp/src/arrow/dataset/scanner.cc",
+]
+
+_ARROW_IPC_SRCS = [
+    "cpp/src/arrow/ipc/dictionary.cc",
+    "cpp/src/arrow/ipc/feather.cc",
+    "cpp/src/arrow/ipc/message.cc",
+    "cpp/src/arrow/ipc/metadata_internal.cc",
+    "cpp/src/arrow/ipc/options.cc",
+    "cpp/src/arrow/ipc/reader.cc",
+    "cpp/src/arrow/ipc/writer.cc",
+]
+
+_PARQUET_SRCS = [
+    "cpp/src/generated/parquet_types.cpp",
+    "cpp/src/parquet/arrow/fuzz_encoding_internal.cc",
+    "cpp/src/parquet/arrow/fuzz_internal.cc",
+    "cpp/src/parquet/arrow/path_internal.cc",
+    "cpp/src/parquet/arrow/reader.cc",
+    "cpp/src/parquet/arrow/reader_internal.cc",
+    "cpp/src/parquet/arrow/schema.cc",
+    "cpp/src/parquet/arrow/schema_internal.cc",
+    "cpp/src/parquet/arrow/writer.cc",
+    "cpp/src/parquet/bloom_filter.cc",
+    "cpp/src/parquet/bloom_filter_reader.cc",
+    "cpp/src/parquet/bloom_filter_writer.cc",
+    "cpp/src/parquet/chunker_internal.cc",
+    "cpp/src/parquet/column_reader.cc",
+    "cpp/src/parquet/column_scanner.cc",
+    "cpp/src/parquet/column_writer.cc",
+    "cpp/src/parquet/decoder.cc",
+    "cpp/src/parquet/encoder.cc",
+    "cpp/src/parquet/encryption/encryption.cc",
+    "cpp/src/parquet/encryption/encryption_internal_nossl.cc",
+    "cpp/src/parquet/encryption/internal_file_decryptor.cc",
+    "cpp/src/parquet/encryption/internal_file_encryptor.cc",
+    "cpp/src/parquet/exception.cc",
+    "cpp/src/parquet/file_reader.cc",
+    "cpp/src/parquet/file_writer.cc",
+    "cpp/src/parquet/geospatial/statistics.cc",
+    "cpp/src/parquet/geospatial/util_internal.cc",
+    "cpp/src/parquet/geospatial/util_json_internal.cc",
+    "cpp/src/parquet/level_comparison.cc",
+    "cpp/src/parquet/level_conversion.cc",
+    "cpp/src/parquet/metadata.cc",
+    "cpp/src/parquet/page_index.cc",
+    "cpp/src/parquet/platform.cc",
+    "cpp/src/parquet/printer.cc",
+    "cpp/src/parquet/properties.cc",
+    "cpp/src/parquet/schema.cc",
+    "cpp/src/parquet/size_statistics.cc",
+    "cpp/src/parquet/statistics.cc",
+    "cpp/src/parquet/stream_reader.cc",
+    "cpp/src/parquet/stream_writer.cc",
+    "cpp/src/parquet/types.cc",
+    "cpp/src/parquet/xxhasher.cc",
+]
+
+_ARROW_FLIGHT_SRCS = [
+    "cpp/src/arrow/flight/client.cc",
+    "cpp/src/arrow/flight/client_cookie_middleware.cc",
+    "cpp/src/arrow/flight/client_tracing_middleware.cc",
+    "cpp/src/arrow/flight/cookie_internal.cc",
+    "cpp/src/arrow/flight/middleware.cc",
+    "cpp/src/arrow/flight/serialization_internal.cc",
+    "cpp/src/arrow/flight/server.cc",
+    "cpp/src/arrow/flight/server_auth.cc",
+    "cpp/src/arrow/flight/server_tracing_middleware.cc",
+    "cpp/src/arrow/flight/transport.cc",
+    "cpp/src/arrow/flight/transport/grpc/grpc_client.cc",
+    "cpp/src/arrow/flight/transport/grpc/grpc_server.cc",
+    "cpp/src/arrow/flight/transport/grpc/protocol_grpc_internal.cc",
+    "cpp/src/arrow/flight/transport/grpc/serialization_internal.cc",
+    "cpp/src/arrow/flight/transport/grpc/util_internal.cc",
+    "cpp/src/arrow/flight/transport_server.cc",
+    "cpp/src/arrow/flight/types.cc",
+]
+
+_ARROW_FLIGHT_SQL_SRCS = [
+    "cpp/src/arrow/flight/sql/client.cc",
+    "cpp/src/arrow/flight/sql/column_metadata.cc",
+    "cpp/src/arrow/flight/sql/protocol_internal.cc",
+    "cpp/src/arrow/flight/sql/server.cc",
+    "cpp/src/arrow/flight/sql/server_session_middleware.cc",
+    "cpp/src/arrow/flight/sql/sql_info_internal.cc",
+]
+
+_COMMON_CXXOPTS = select({
+    "@rules_cc//cc/compiler:clang-cl": [
+        "/FIxsimd/xsimd.hpp",
+        "/std:c++20",
+    ],
+    "@rules_cc//cc/compiler:msvc-cl": [
+        "/FIxsimd/xsimd.hpp",
+        "/std:c++20",
+    ],
+    "//conditions:default": [
+        "-include",
+        "xsimd/xsimd.hpp",
+        "-std=c++20",
+        "-Wno-deprecated-declarations",
+    ],
+})
+
+config_setting(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "macos_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:macos",
+    ],
+)
+
+config_setting(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+)
+
+_BASELINE_SIMD_CXXOPTS = select({
+    ":linux_x86_64": ["-msse4.2"],
+    ":macos_x86_64": ["-msse4.2"],
+    "//conditions:default": [],
+})
+
+cc_library(
+    name = "arrow_headers",
+    hdrs = glob([
+        "cpp/src/arrow/*.h",
+        "cpp/src/arrow/acero/**/*.h",
+        "cpp/src/arrow/array/**/*.h",
+        "cpp/src/arrow/c/*.h",
+        "cpp/src/arrow/compute/**/*.h",
+        "cpp/src/arrow/csv/**/*.h",
+        "cpp/src/arrow/dataset/**/*.h",
+        "cpp/src/arrow/extension/*.h",
+        "cpp/src/arrow/filesystem/**/*.h",
+        "cpp/src/arrow/io/*.h",
+        "cpp/src/arrow/ipc/*.h",
+        "cpp/src/arrow/json/**/*.h",
+        "cpp/src/arrow/tensor/*.h",
+        "cpp/src/arrow/util/*.h",
+        "cpp/src/arrow/vendored/**/*.h",
+        "cpp/src/arrow/vendored/**/*.hpp",
+    ]) + [
+        "cpp/thirdparty/hadoop/include/hdfs.h",
+        "cpp/src/arrow/util/config.h",
+        "cpp/src/arrow/util/config_internal.h",
+    ],
+    textual_hdrs = glob([
+        "cpp/src/arrow/vendored/datetime/*.cpp",
+    ]) + [
+        "cpp/src/arrow/compute/kernels/aggregate_basic.inc.cc",
+    ],
+    defines = [
+        "ARROW_ACERO_STATIC",
+        "ARROW_COMPUTE_STATIC",
+        "ARROW_DS_STATIC",
+        "ARROW_STATIC",
+    ],
+    includes = [
+        "cpp/src",
+        "cpp/thirdparty/hadoop/include",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":arrow_flatbuffers",
+        "@flatbuffers//:flatbuffers",
+        "@rapidjson//:rapidjson",
+        "@xsimd//:xsimd",
+    ],
+)
+
+cc_library(
+    name = "arrow_flight_headers",
+    hdrs = glob([
+        "cpp/src/arrow/flight/*.h",
+        "cpp/src/arrow/flight/sql/*.h",
+        "cpp/src/arrow/flight/transport/grpc/*.h",
+        ]) + [
+        ":flight_pb",
+        ":flight_grpc_h",
+        ":flight_sql_h",
+        ":flight_grpc_cc",
+        ":flight_sql_cc",
+        ],
+    defines = [
+        "ARROW_FLIGHT_SQL_EXPORT=",
+        "ARROW_FLIGHT_SQL_STATIC",
+        "ARROW_FLIGHT_STATIC",
+    ],
+    includes = ["cpp/src"],
+    textual_hdrs = [
+        ":flight_grpc_codegen",
+        ":flight_sql_codegen",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":arrow_headers",
+        ":flight_cc_proto",
+        "@grpc//:grpc++",
+        "@protobuf//:protobuf",
+    ],
+)
+
+cc_library(
+    name = "parquet_headers",
+    hdrs = glob([
+        "cpp/src/parquet/**/*.h",
+    ]) + [
+        "cpp/src/generated/parquet_types.h",
+        "cpp/src/parquet/parquet_version.h",
+    ],
+    defines = ["PARQUET_STATIC"],
+    includes = ["cpp/src"],
+    textual_hdrs = ["cpp/src/generated/parquet_types.tcc"],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":arrow_headers",
+        "@rapidjson//:rapidjson",
+        "@thrift//:thrift",
+        "@xsimd//:xsimd",
+    ],
+)
+
+cc_library(
+    name = "parquet_avx2",
+    srcs = [
+        "cpp/src/parquet/bloom_filter_avx2.cc",
+        "cpp/src/parquet/level_comparison_avx2.cc",
+    ],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX2"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX2"],
+        "//conditions:default": ["-mavx2"],
+    }),
+    local_defines = ["ARROW_HAVE_AVX2"],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":parquet_headers"],
+)
+
+cc_library(
+    name = "parquet_bmi2",
+    srcs = ["cpp/src/parquet/level_conversion_bmi2.cc"],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX2"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX2"],
+        "//conditions:default": [
+            "-mavx2",
+            "-mbmi2",
+        ],
+    }),
+    local_defines = ["ARROW_HAVE_BMI2"],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":parquet_headers"],
+)
+
+cc_library(
+    name = "arrow_core_avx2",
+    srcs = [
+        "cpp/src/arrow/util/bpacking_simd_256.cc",
+        "cpp/src/arrow/util/byte_stream_split_internal_avx2.cc",
+    ],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX2"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX2"],
+        "//conditions:default": [
+            "-mavx2",
+            "-msse4.2",
+        ],
+    }),
+    local_defines = [
+        "ARROW_HAVE_AVX2",
+        "ARROW_HAVE_RUNTIME_AVX2",
+        "ARROW_HAVE_RUNTIME_SSE4_2",
+    ],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow_core_avx512",
+    srcs = ["cpp/src/arrow/util/bpacking_simd_avx512.cc"],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX512"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX512"],
+        "//conditions:default": [
+            "-mavx512bw",
+            "-mavx512cd",
+            "-mavx512dq",
+            "-mavx512f",
+            "-mavx512vl",
+        ],
+    }),
+    local_defines = [
+        "ARROW_HAVE_AVX512",
+        "ARROW_HAVE_RUNTIME_AVX512",
+    ],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow_core_sve128",
+    srcs = ["cpp/src/arrow/util/bpacking_simd_128_alt.cc"],
+    cxxopts = _COMMON_CXXOPTS + [
+        "-march=armv8-a+sve",
+        "-msve-vector-bits=128",
+    ],
+    local_defines = [
+        "ARROW_HAVE_RUNTIME_SVE128",
+        "ARROW_HAVE_SVE128",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow_core_sve256",
+    srcs = ["cpp/src/arrow/util/bpacking_simd_256.cc"],
+    cxxopts = _COMMON_CXXOPTS + [
+        "-march=armv8-a+sve",
+        "-msve-vector-bits=256",
+    ],
+    local_defines = [
+        "ARROW_HAVE_RUNTIME_SVE256",
+        "ARROW_HAVE_SVE256",
+    ],
+    target_compatible_with = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow_compute_avx2",
+    srcs = [
+        "cpp/src/arrow/compute/kernels/aggregate_basic_avx2.cc",
+        "cpp/src/arrow/compute/key_hash_internal_avx2.cc",
+        "cpp/src/arrow/compute/row/compare_internal_avx2.cc",
+        "cpp/src/arrow/compute/row/encode_internal_avx2.cc",
+    ],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX2"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX2"],
+        "//conditions:default": [
+            "-mavx2",
+            "-msse4.2",
+        ],
+    }),
+    local_defines = [
+        "ARROW_HAVE_AVX2",
+        "ARROW_HAVE_RUNTIME_AVX2",
+        "ARROW_HAVE_RUNTIME_SSE4_2",
+    ],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow_compute_avx2_bmi2",
+    srcs = [
+        "cpp/src/arrow/compute/key_map_internal_avx2.cc",
+        "cpp/src/arrow/compute/util_avx2.cc",
+    ],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX2"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX2"],
+        "//conditions:default": [
+            "-mavx2",
+            "-mbmi2",
+            "-msse4.2",
+        ],
+    }),
+    local_defines = [
+        "ARROW_HAVE_AVX2",
+        "ARROW_HAVE_BMI2",
+        "ARROW_HAVE_RUNTIME_AVX2",
+        "ARROW_HAVE_RUNTIME_BMI2",
+        "ARROW_HAVE_RUNTIME_SSE4_2",
+    ],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow_compute_avx512",
+    srcs = ["cpp/src/arrow/compute/kernels/aggregate_basic_avx512.cc"],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX512"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX512"],
+        "//conditions:default": [
+            "-mavx512bw",
+            "-mavx512cd",
+            "-mavx512dq",
+            "-mavx512f",
+            "-mavx512vl",
+        ],
+    }),
+    local_defines = [
+        "ARROW_HAVE_AVX512",
+        "ARROW_HAVE_RUNTIME_AVX512",
+    ],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow_acero_avx2",
+    srcs = [
+        "cpp/src/arrow/acero/bloom_filter_avx2.cc",
+        "cpp/src/arrow/acero/swiss_join_avx2.cc",
+    ],
+    cxxopts = _COMMON_CXXOPTS + select({
+        "@rules_cc//cc/compiler:clang-cl": ["/arch:AVX2"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/arch:AVX2"],
+        "//conditions:default": [
+            "-mavx2",
+            "-msse4.2",
+        ],
+    }),
+    local_defines = [
+        "ARROW_HAVE_AVX2",
+        "ARROW_HAVE_RUNTIME_AVX2",
+        "ARROW_HAVE_RUNTIME_SSE4_2",
+    ],
+    target_compatible_with = ["@platforms//cpu:x86_64"],
+    visibility = ["//visibility:private"],
+    deps = [":arrow_headers"],
+)
+
+cc_library(
+    name = "arrow",
+    srcs = _ARROW_SRCS +
+           _ARROW_ARRAY_SRCS +
+           _ARROW_CSV_SRCS +
+           _ARROW_FILESYSTEM_SRCS +
+           _ARROW_IO_SRCS +
+           _ARROW_IPC_SRCS +
+           _ARROW_JSON_SRCS +
+           _ARROW_VENDORED_SRCS +
+           _ARROW_UTIL_SRCS +
+           _ARROW_COMPUTE_CORE_SRCS + [
+               "cpp/src/arrow/memory_pool.cc",
+            #    "cpp/src/arrow/memory_pool_jemalloc.cc",
+               "cpp/src/arrow/memory_pool_mimalloc.cc",
+           ] + select({
+               "@platforms//os:macos": ["cpp/src/arrow/vendored/datetime/ios.mm"],
+               "//conditions:default": [],
+           }),
+    cxxopts = _COMMON_CXXOPTS + _BASELINE_SIMD_CXXOPTS,
+    local_defines = [
+        "ARROW_EXPORTING",
+        "URI_STATIC_BUILD",
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            "ARROW_HAVE_RUNTIME_AVX2",
+            "ARROW_HAVE_RUNTIME_AVX512",
+            "ARROW_HAVE_RUNTIME_BMI2",
+            "ARROW_HAVE_RUNTIME_SSE4_2",
+            "ARROW_HAVE_SSE4_2",
+        ],
+        ":linux_aarch64": [
+            "ARROW_HAVE_NEON",
+            "ARROW_HAVE_RUNTIME_SVE128",
+            "ARROW_HAVE_RUNTIME_SVE256",
+        ],
+        ":macos_aarch64": ["ARROW_HAVE_NEON"],
+        "//conditions:default": [],
+    }),
+    linkopts = select({
+        "@platforms//os:linux": [
+            "-ldl",
+            "-pthread",
+            "-lrt",
+        ],
+        "@platforms//os:macos": ["-pthread"],
+        "@platforms//os:windows": ["ws2_32.lib"],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":arrow_headers",
+        "@brotli//:brotlidec",
+        "@brotli//:brotlienc",
+        "@bzip2//:bz2",
+        "@glog",
+        "@lz4//:lz4_frame",
+        "@mimalloc//:mimalloc",
+        "@mimalloc//:mimalloc-api",
+        "@opentelemetry-cpp//api",
+        "@re2//:re2",
+        "@snappy//:snappy",
+        "@simdjson",
+        "@utf8proc//:utf8proc",
+        "@zlib//:zlib",
+        "@zstd//:zstd",
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            ":arrow_core_avx2",
+            ":arrow_core_avx512",
+        ],
+        ":linux_aarch64": [
+            ":arrow_core_sve128",
+            ":arrow_core_sve256",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "arrow_compute",
+    srcs = _ARROW_COMPUTE_SRCS,
+    cxxopts = _COMMON_CXXOPTS + _BASELINE_SIMD_CXXOPTS,
+    local_defines = ["ARROW_COMPUTE_EXPORTING"] + select({
+        "@platforms//cpu:x86_64": [
+            "ARROW_HAVE_RUNTIME_AVX2",
+            "ARROW_HAVE_RUNTIME_AVX512",
+            "ARROW_HAVE_RUNTIME_BMI2",
+            "ARROW_HAVE_RUNTIME_SSE4_2",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":arrow",
+        "@re2//:re2",
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            ":arrow_compute_avx2",
+            ":arrow_compute_avx2_bmi2",
+            ":arrow_compute_avx512",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "arrow_acero",
+    srcs = _ARROW_ACERO_SRCS,
+    cxxopts = _COMMON_CXXOPTS + _BASELINE_SIMD_CXXOPTS,
+    local_defines = ["ARROW_ACERO_EXPORTING"] + select({
+        "@platforms//cpu:x86_64": [
+            "ARROW_HAVE_RUNTIME_AVX2",
+            "ARROW_HAVE_RUNTIME_SSE4_2",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":arrow",
+        ":arrow_compute",
+        "@opentelemetry-cpp//api",
+    ] + select({
+        "@platforms//cpu:x86_64": [":arrow_acero_avx2"],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "parquet",
+    srcs = _PARQUET_SRCS,
+    cxxopts = _COMMON_CXXOPTS + _BASELINE_SIMD_CXXOPTS,
+    local_defines = [
+        "PARQUET_EXPORTING",
+        "PARQUET_THRIFT_VERSION_MAJOR=0",
+        "PARQUET_THRIFT_VERSION_MINOR=22",
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            "ARROW_HAVE_RUNTIME_AVX2",
+            "ARROW_HAVE_RUNTIME_BMI2",
+            "ARROW_HAVE_RUNTIME_SSE4_2",
+        ],
+        "//conditions:default": [],
+    }),
+    visibility = ["//visibility:public"],
+    deps = [
+        ":arrow",
+        ":parquet_headers",
+        "@rapidjson//:rapidjson",
+        "@thrift//:thrift",
+        "@xsimd//:xsimd",
+    ] + select({
+        "@platforms//cpu:x86_64": [
+            ":parquet_avx2",
+            ":parquet_bmi2",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+cc_library(
+    name = "arrow_dataset",
+    srcs = _ARROW_DATASET_SRCS,
+    cxxopts = _COMMON_CXXOPTS + _BASELINE_SIMD_CXXOPTS,
+    local_defines = ["ARROW_DS_EXPORTING"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":arrow",
+        ":arrow_acero",
+        ":arrow_compute",
+        ":parquet",
+    ],
+)
+
+cc_library(
+    name = "arrow_flight",
+    srcs = _ARROW_FLIGHT_SRCS,
+    cxxopts = _COMMON_CXXOPTS,
+    local_defines = [
+        "ARROW_FLIGHT_EXPORTING",
+        "GRPC_ENABLE_ASYNC",
+        "GRPC_NAMESPACE_FOR_TLS_CREDENTIALS_OPTIONS=grpc::experimental",
+        "GRPC_USE_CERTIFICATE_VERIFIER",
+        "GRPC_USE_TLS_CHANNEL_CREDENTIALS_OPTIONS",
+    ],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":arrow",
+        ":arrow_flight_headers",
+        "@grpc//:grpc++",
+        "@protobuf//:protobuf",
+        "@abseil-cpp//absl/status:status",
+    ],
+)
+
+cc_library(
+    name = "arrow_flight_sql",
+    srcs = _ARROW_FLIGHT_SQL_SRCS,
+    cxxopts = _COMMON_CXXOPTS,
+    local_defines = ["ARROW_FLIGHT_SQL_EXPORTING"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":arrow_flight",
+        ":arrow_flight_headers",
+        "@protobuf//:protobuf",
+    ],
+)

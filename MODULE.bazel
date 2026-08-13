@@ -1,0 +1,59 @@
+module(name = "arrow-deps", version = "0.0.0")
+
+bazel_dep(name = "abseil-cpp", version = "20260526.0")
+bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
+bazel_dep(name = "aspect_rules_esbuild", version = "0.27.0")
+bazel_dep(name = "bazel_lib", version = "3.7.1")
+bazel_dep(name = "boost.system", version = "1.90.0.bcr.1")
+bazel_dep(name = "brotli", version = "1.2.0.bcr.1")
+bazel_dep(name = "bzip2", version = "1.0.8.bcr.4")
+bazel_dep(name = "flatbuffers", version = "25.12.19")
+bazel_dep(name = "glog", version = "0.7.1.bcr.1")
+bazel_dep(name = "grpc", version = "1.83.0")
+bazel_dep(name = "lz4", version = "1.10.0.bcr.1")
+bazel_dep(name = "mimalloc", version = "2.2.4.bcr.2")
+bazel_dep(name = "opentelemetry-cpp", version = "1.27.0")
+bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "protobuf", version = "35.1")
+bazel_dep(name = "rapidjson", version = "1.1.0.bcr.20250205")
+bazel_dep(name = "re2", version = "2025-11-05.bcr.1")
+bazel_dep(name = "rules_cc", version = "0.2.22")
+bazel_dep(name = "rules_proto", version = "7.1.0")
+bazel_dep(name = "simdjson", version = "4.6.0")
+bazel_dep(name = "snappy", version = "1.2.2.bcr.3")
+bazel_dep(name = "utf8proc", version = "2.11.0")
+bazel_dep(name = "zlib", version = "1.3.2")
+bazel_dep(name = "zstd", version = "1.5.7.bcr.1")
+
+# MODULE.bazel
+git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+
+git_repository(
+    name = "xsimd",
+    remote = "https://github.com/xtensor-stack/xsimd.git",
+    commit = "eb34bc1fcdfae7efcac6476c52adaaba145f1f4b",
+    build_file = "//bazel/build_files:xsimd.bazel",
+)
+
+git_repository(
+    name = "arrow",
+    remote = "https://github.com/apache/arrow.git",
+    commit = "c44eca6892364e58489fe564f910c0e1c1c6cb6b",
+    build_file = "//bazel/build_files:arrow.bazel",
+)
+
+git_repository(
+    name = "thrift",
+    remote = "https://github.com/apache/thrift.git",
+    commit = "a42b18b9a93865ed796c4494133c77108fce98b4",
+    build_file = "//bazel/build_files:thrift.bazel",
+)
+
+## Add explcit dependency to rules_cc for Bazel 9.1.0
+single_version_override(
+    module_name = "utf8proc",
+    patch_cmds = [
+        "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' BUILD",
+        "sed -i '$a\\bazel_dep(name = \"rules_cc\", version = \"0.2.19\")' MODULE.bazel",
+    ],
+)
