@@ -12,9 +12,10 @@ Parquet, Flight, and Flight SQL. See the README for intentionally omitted parts.
 
 load("@flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 load("@grpc//bazel:generate_cc.bzl", "generate_cc")
-load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
+load(":constants.bzl", "constants")
 
 licenses(["notice"])  # Apache-2.0
 
@@ -39,9 +40,10 @@ genrule(
     srcs = ["cpp/src/arrow/util/config.h.cmake"],
     outs = ["cpp/src/arrow/util/config.h"],
     cmd = ("sed " +
-           "-e 's/@ARROW_VERSION_MAJOR@/25/g' " +
-           "-e 's/@ARROW_VERSION_MINOR@/0/g' " +
-           "-e 's/@ARROW_VERSION_PATCH@/1/g' " +
+           "-e 's/@ARROW_VERSION_MAJOR@/{}/g' ".format(constants["Arrow_Version_Major"]) +
+           "-e 's/@ARROW_VERSION_MINOR@/{}/g' ".format(constants["Arrow_Version_Minor"]) +
+           "-e 's/@ARROW_VERSION_PATCH@/{}/g' ".format(constants["Arrow_Version_Patch"]) +
+           "-e 's/@ARROW_VERSION@/{}/g' ".format(constants["Arrow_Version"]) +
            "-e 's/cmakedefine ARROW_USE_NATIVE_INT128/undef ARROW_USE_NATIVE_INT128/g' " +
            "-e 's/cmakedefine/define/g' " +
            "$< >$@"),
@@ -59,9 +61,9 @@ genrule(
     srcs = ["cpp/src/parquet/parquet_version.h.in"],
     outs = ["cpp/src/parquet/parquet_version.h"],
     cmd = ("sed " +
-           "-e 's/@PARQUET_VERSION_MAJOR@/25/g' " +
-           "-e 's/@PARQUET_VERSION_MINOR@/0/g' " +
-           "-e 's/@PARQUET_VERSION_PATCH@/0/g' " +
+           "-e 's/@PARQUET_VERSION_MAJOR@/{}/g' ".format(constants["Parquet_Version_Major"]) +
+           "-e 's/@PARQUET_VERSION_MINOR@/{}/g' ".format(constants["Parquet_Version_Major"]) +
+           "-e 's/@PARQUET_VERSION_PATCH@/{}/g' ".format(constants["Parquet_Version_Major"]) +
            "$< >$@"),
 )
 
@@ -668,13 +670,13 @@ cc_library(
         "cpp/src/arrow/flight/*.h",
         "cpp/src/arrow/flight/sql/*.h",
         "cpp/src/arrow/flight/transport/grpc/*.h",
-        ]) + [
+    ]) + [
         ":flight_pb",
         ":flight_grpc_h",
         ":flight_sql_h",
         ":flight_grpc_cc",
         ":flight_sql_cc",
-        ],
+    ],
     defines = [
         "ARROW_FLIGHT_SQL_EXPORT=",
         "ARROW_FLIGHT_SQL_STATIC",
@@ -858,7 +860,10 @@ cc_library(
     ],
     target_compatible_with = ["@platforms//cpu:x86_64"],
     visibility = ["//visibility:private"],
-    deps = [":arrow_headers"],
+    deps = [
+        ":arrow_headers",
+        "@boost.multiprecision",
+    ],
 )
 
 cc_library(
@@ -885,7 +890,10 @@ cc_library(
     ],
     target_compatible_with = ["@platforms//cpu:x86_64"],
     visibility = ["//visibility:private"],
-    deps = [":arrow_headers"],
+    deps = [
+        ":arrow_headers",
+        "@boost.multiprecision",
+    ],
 )
 
 cc_library(
@@ -908,7 +916,10 @@ cc_library(
     ],
     target_compatible_with = ["@platforms//cpu:x86_64"],
     visibility = ["//visibility:private"],
-    deps = [":arrow_headers"],
+    deps = [
+        ":arrow_headers",
+        "@boost.multiprecision",
+    ],
 )
 
 cc_library(
@@ -947,13 +958,13 @@ cc_library(
            _ARROW_VENDORED_SRCS +
            _ARROW_UTIL_SRCS +
            _ARROW_COMPUTE_CORE_SRCS + [
-               "cpp/src/arrow/memory_pool.cc",
-            #    "cpp/src/arrow/memory_pool_jemalloc.cc",
-               "cpp/src/arrow/memory_pool_mimalloc.cc",
-           ] + select({
-               "@platforms//os:macos": ["cpp/src/arrow/vendored/datetime/ios.mm"],
-               "//conditions:default": [],
-           }),
+        "cpp/src/arrow/memory_pool.cc",
+        #    "cpp/src/arrow/memory_pool_jemalloc.cc",
+        "cpp/src/arrow/memory_pool_mimalloc.cc",
+    ] + select({
+        "@platforms//os:macos": ["cpp/src/arrow/vendored/datetime/ios.mm"],
+        "//conditions:default": [],
+    }),
     cxxopts = _COMMON_CXXOPTS + _BASELINE_SIMD_CXXOPTS,
     local_defines = [
         "ARROW_EXPORTING",
@@ -1032,6 +1043,7 @@ cc_library(
     deps = [
         ":arrow",
         "@re2//:re2",
+        "@boost.multiprecision",
     ] + select({
         "@platforms//cpu:x86_64": [
             ":arrow_compute_avx2",
@@ -1110,6 +1122,7 @@ cc_library(
     ],
 )
 
+# FIXME: GCC16 -Werror=discarded-qualifiers in boringssl
 cc_library(
     name = "arrow_flight",
     srcs = _ARROW_FLIGHT_SRCS,

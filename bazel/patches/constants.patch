@@ -1,0 +1,16 @@
+--- a/dev/null
++++ b/constants.bzl
+@@ -0,0 +1,13 @@
++ARROW_VERSION_MAJOR = 25
++ARROW_VERSION_MINOR = 0
++ARROW_VERSION_PATCH = 1
++
++constants = {
++    "Arrow_Version_Major": ARROW_VERSION_MAJOR,
++    "Arrow_Version_Minor": ARROW_VERSION_MINOR,
++    "Arrow_Version_Patch": ARROW_VERSION_PATCH,
++    "Arrow_Version": "{}{}{}".format(ARROW_VERSION_MAJOR * 1000000, ARROW_VERSION_MINOR * 1000, ARROW_VERSION_PATCH),
++    "Parquet_Version_Major": "25",
++    "Parquet_Version_Minor": "0",
++    "Parquet_Version_Patch": "0",
++}
