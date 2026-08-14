@@ -1,4 +1,7 @@
-module(name = "arrow-deps", version = "0.0.0")
+module(
+    name = "arrow-deps",
+    version = "0.0.0",
+)
 
 bazel_dep(name = "abseil-cpp", version = "20260526.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
@@ -31,25 +34,28 @@ git_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:git.bzl", "g
 
 git_repository(
     name = "xsimd",
-    remote = "https://github.com/xtensor-stack/xsimd.git",
-    commit = "eb34bc1fcdfae7efcac6476c52adaaba145f1f4b",
     build_file = "//bazel/build_files:xsimd.bazel",
+    commit = "eb34bc1fcdfae7efcac6476c52adaaba145f1f4b",
+    remote = "https://github.com/xtensor-stack/xsimd.git",
 )
 
 git_repository(
     name = "arrow",
-    remote = "https://github.com/apache/arrow.git",
-    commit = "c44eca6892364e58489fe564f910c0e1c1c6cb6b",
-    patches = ["//bazel/patches:arrow-includes.patch"], # see comment at the bottom
-    patch_strip = 1,
     build_file = "//bazel/build_files:arrow.bazel",
+    commit = "c44eca6892364e58489fe564f910c0e1c1c6cb6b",
+    patch_strip = 1,
+    patches = [
+        "//bazel/patches:constants.patch",
+        "//bazel/patches:arrow-includes.patch",
+    ],  # see comment at the bottom
+    remote = "https://github.com/apache/arrow.git",
 )
 
 git_repository(
     name = "thrift",
-    remote = "https://github.com/apache/thrift.git",
-    commit = "a42b18b9a93865ed796c4494133c77108fce98b4",
     build_file = "//bazel/build_files:thrift.bazel",
+    commit = "a42b18b9a93865ed796c4494133c77108fce98b4",
+    remote = "https://github.com/apache/thrift.git",
 )
 
 ## Add explcit dependency to rules_cc for Bazel 9.1.0
