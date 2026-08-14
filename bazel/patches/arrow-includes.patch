@@ -1,0 +1,60 @@
+diff -ruN a/cpp/src/arrow/compute/kernels/scalar_string_ascii.cc b/cpp/src/arrow/compute/kernels/scalar_string_ascii.cc
+--- a/cpp/src/arrow/compute/kernels/scalar_string_ascii.cc	2026-08-14 12:56:18.684416539 +0100
++++ b/cpp/src/arrow/compute/kernels/scalar_string_ascii.cc	2026-08-14 12:56:33.674803740 +0100
+@@ -35,7 +35,7 @@
+ #include "arrow/util/value_parsing.h"
+ 
+ #ifdef ARROW_WITH_RE2
+-#  include <re2/re2.h>
++#  include "re2/re2.h"
+ #endif
+ 
+ namespace arrow {
+diff -ruN a/cpp/src/arrow/compute/kernels/scalar_string_test.cc b/cpp/src/arrow/compute/kernels/scalar_string_test.cc
+--- a/cpp/src/arrow/compute/kernels/scalar_string_test.cc	2026-08-14 12:56:18.684416539 +0100
++++ b/cpp/src/arrow/compute/kernels/scalar_string_test.cc	2026-08-14 12:56:33.676803792 +0100
+@@ -36,7 +36,7 @@
+ #include "arrow/util/value_parsing.h"
+ 
+ #ifdef ARROW_WITH_UTF8PROC
+-#  include <utf8proc.h>
++#  include "utf8proc.h"
+ #endif
+ 
+ namespace arrow::compute {
+diff -ruN a/cpp/src/arrow/compute/kernels/scalar_string_utf8.cc b/cpp/src/arrow/compute/kernels/scalar_string_utf8.cc
+--- a/cpp/src/arrow/compute/kernels/scalar_string_utf8.cc	2026-08-14 12:56:18.684416539 +0100
++++ b/cpp/src/arrow/compute/kernels/scalar_string_utf8.cc	2026-08-14 12:56:33.674803740 +0100
+@@ -26,7 +26,7 @@
+ #include "arrow/util/utf8_internal.h"
+ 
+ #ifdef ARROW_WITH_UTF8PROC
+-#  include <utf8proc.h>
++#  include "utf8proc.h"
+ #endif
+ 
+ namespace arrow {
+diff -ruN a/cpp/src/arrow/flight/transport/grpc/customize_grpc.h b/cpp/src/arrow/flight/transport/grpc/customize_grpc.h
+--- a/cpp/src/arrow/flight/transport/grpc/customize_grpc.h	2026-08-14 12:56:18.705417081 +0100
++++ b/cpp/src/arrow/flight/transport/grpc/customize_grpc.h	2026-08-14 12:56:33.688804102 +0100
+@@ -32,7 +32,7 @@
+ #    define NDEBUG
+ #  endif
+ 
+-#  include <absl/synchronization/mutex.h>
++#  include "absl/synchronization/mutex.h"
+ 
+ #  ifdef ARROW_NO_NDEBUG
+ #    undef NDEBUG
+diff -ruN a/cpp/src/arrow/flight/transport/grpc/util_internal.h b/cpp/src/arrow/flight/transport/grpc/util_internal.h
+--- a/cpp/src/arrow/flight/transport/grpc/util_internal.h	2026-08-14 12:56:18.705417081 +0100
++++ b/cpp/src/arrow/flight/transport/grpc/util_internal.h	2026-08-14 12:56:33.686804050 +0100
+@@ -36,7 +36,7 @@
+ #endif
+ 
+ #if GRPC_CPP_VERSION_CHECK(1, 80, 0)
+-#  include <absl/status/status.h>
++#  include "absl/status/status.h"
+ #endif
+ 
+ namespace grpc {
