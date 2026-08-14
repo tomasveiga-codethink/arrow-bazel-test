@@ -12,6 +12,8 @@ Parquet, Flight, and Flight SQL. See the README for intentionally omitted parts.
 
 load("@flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 load("@grpc//bazel:generate_cc.bzl", "generate_cc")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
+load("@rules_cc//cc:cc_test.bzl", "cc_test")
 load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
@@ -45,6 +47,8 @@ genrule(
            "-e 's/@ARROW_VERSION_PATCH@/{}/g' ".format(constants["Arrow_Version_Patch"]) +
            "-e 's/@ARROW_VERSION@/{}/g' ".format(constants["Arrow_Version"]) +
            "-e 's/cmakedefine ARROW_USE_NATIVE_INT128/undef ARROW_USE_NATIVE_INT128/g' " +
+           "-e 's/cmakedefine ARROW_JEMALLOC_VENDORED/undef ARROW_JEMALLOC_VENDORED/g' " +
+           "-e 's/cmakedefine ARROW_JEMALLOC/undef ARROW_JEMALLOC/g' " +
            "-e 's/cmakedefine/define/g' " +
            "$< >$@"),
 )
@@ -237,6 +241,8 @@ _ARROW_FILESYSTEM_SRCS = [
     "cpp/src/arrow/filesystem/mockfs.cc",
     "cpp/src/arrow/filesystem/path_util.cc",
     "cpp/src/arrow/filesystem/util_internal.cc",
+    "cpp/src/arrow/filesystem/gcsfs.cc",
+    # "cpp/src/arrow/filesystem/azurefs.cc",
 ]
 
 _ARROW_JSON_SRCS = [
@@ -252,6 +258,7 @@ _ARROW_JSON_SRCS = [
     "cpp/src/arrow/json/options.cc",
     "cpp/src/arrow/json/parser.cc",
     "cpp/src/arrow/json/reader.cc",
+    "cpp/src/arrow/json/json_writer_internal.cc",
 ]
 
 _ARROW_VENDORED_SRCS = [
@@ -998,6 +1005,8 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":arrow_headers",
+        # "@azure-core-cpp//:azure_core_cpp",
+        "@google_cloud_cpp//:storage_grpc",
         "@brotli//:brotlidec",
         "@brotli//:brotlienc",
         "@bzip2//:bz2",
@@ -1155,5 +1164,24 @@ cc_library(
         ":arrow_flight",
         ":arrow_flight_headers",
         "@protobuf//:protobuf",
+    ],
+)
+
+cc_test(
+    name = "arrow_components_test",
+    srcs = ["arrow_components_test.cc"],
+    cxxopts = select({
+        "@rules_cc//cc/compiler:clang-cl": ["/std:c++20"],
+        "@rules_cc//cc/compiler:msvc-cl": ["/std:c++20"],
+        "//conditions:default": ["-std=c++20"],
+    }),
+    deps = [
+        "@arrow",
+        "@arrow//:arrow_acero",
+        "@arrow//:arrow_compute",
+        "@arrow//:arrow_dataset",
+        "@arrow//:arrow_flight",
+        "@arrow//:arrow_flight_sql",
+        "@arrow//:parquet",
     ],
 )

@@ -1,0 +1,150 @@
+--- /dev/null	2026-08-08 09:59:50.538999954 +0100
++++ b/arrow_components_test.cc	2026-08-14 14:40:32.903348347 +0100
+@@ -0,0 +1,147 @@
++#include <cassert>
++#include <cstdint>
++#include <memory>
++#include <string>
++#include <vector>
++
++#include "arrow/api.h"
++#include "arrow/compute/api.h"
++#include "arrow/compute/initialize.h"
++#include "arrow/dataset/dataset.h"
++#include "arrow/dataset/file_parquet.h"
++#include "arrow/flight/api.h"
++#include "arrow/flight/sql/api.h"
++#include "arrow/io/api.h"
++#include "arrow/ipc/api.h"
++#include "arrow/util/compression.h"
++#include "parquet/arrow/reader.h"
++#include "parquet/arrow/writer.h"
++
++namespace {
++
++void TestCodec(arrow::Compression::type compression) {
++  const std::string input(4096, 'a');
++  auto codec_result = arrow::util::Codec::Create(compression);
++  assert(codec_result.ok());
++  auto codec = std::move(*codec_result);
++  std::vector<std::uint8_t> compressed(
++      codec->MaxCompressedLen(input.size(),
++                              reinterpret_cast<const std::uint8_t*>(input.data())));
++  auto compressed_size = codec->Compress(
++      input.size(), reinterpret_cast<const std::uint8_t*>(input.data()),
++      compressed.size(), compressed.data());
++  assert(compressed_size.ok());
++  std::vector<std::uint8_t> output(input.size());
++  auto output_size = codec->Decompress(*compressed_size, compressed.data(), output.size(),
++                                       output.data());
++  assert(output_size.ok());
++  assert(*output_size == static_cast<std::int64_t>(input.size()));
++  assert(std::string(reinterpret_cast<const char*>(output.data()), output.size()) == input);
++}
++
++void ParquetRoundTrip(const std::shared_ptr<arrow::Schema>& schema,
++                      const std::shared_ptr<arrow::Array>& values) {
++  auto table = arrow::Table::Make(schema, {values});
++  auto sink_result = arrow::io::BufferOutputStream::Create();
++  assert(sink_result.ok());
++  auto sink = *sink_result;
++  parquet::WriterProperties::Builder properties_builder;
++  auto properties =
++      properties_builder.compression(parquet::Compression::ZSTD)->build();
++  assert(parquet::arrow::WriteTable(*table, arrow::default_memory_pool(), sink,
++                                    table->num_rows(), properties)
++             .ok());
++  auto buffer_result = sink->Finish();
++  assert(buffer_result.ok());
++
++  auto input = std::make_shared<arrow::io::BufferReader>(*buffer_result);
++  auto reader_result =
++      parquet::arrow::OpenFile(input, arrow::default_memory_pool());
++  assert(reader_result.ok());
++  auto restored_result = (*reader_result)->ReadTable();
++  assert(restored_result.ok());
++  assert((*restored_result)->Equals(*table));
++
++  arrow::dataset::ParquetFileFormat format;
++  assert(format.type_name() == "parquet");
++}
++
++void RoundTrip(arrow::Compression::type compression) {
++  std::vector<std::int64_t> input(1024);
++  for (std::size_t i = 0; i < input.size(); ++i) input[i] = i % 8;
++
++  arrow::Int64Builder builder;
++  assert(builder.AppendValues(input).ok());
++  std::shared_ptr<arrow::Array> values;
++  assert(builder.Finish(&values).ok());
++
++  auto schema = arrow::schema({arrow::field("value", arrow::int64())});
++  auto batch = arrow::RecordBatch::Make(schema, input.size(), {values});
++
++  auto sink_result = arrow::io::BufferOutputStream::Create();
++  assert(sink_result.ok());
++  auto sink = *sink_result;
++
++  auto codec_result = arrow::util::Codec::Create(compression);
++  assert(codec_result.ok());
++  auto options = arrow::ipc::IpcWriteOptions::Defaults();
++  options.codec = std::shared_ptr<arrow::util::Codec>(std::move(*codec_result));
++
++  auto writer_result = arrow::ipc::MakeStreamWriter(sink, schema, options);
++  assert(writer_result.ok());
++  auto writer = *writer_result;
++  assert(writer->WriteRecordBatch(*batch).ok());
++  assert(writer->Close().ok());
++
++  auto buffer_result = sink->Finish();
++  assert(buffer_result.ok());
++  auto input_stream = std::make_shared<arrow::io::BufferReader>(*buffer_result);
++  auto reader_result = arrow::ipc::RecordBatchStreamReader::Open(input_stream);
++  assert(reader_result.ok());
++  auto read_result = (*reader_result)->Next();
++  assert(read_result.ok());
++  assert((*read_result)->Equals(*batch));
++}
++
++}  // namespace
++
++int main() {
++  for (auto compression : {
++           arrow::Compression::BROTLI,
++           arrow::Compression::GZIP,
++           arrow::Compression::SNAPPY,
++           arrow::Compression::ZSTD,
++       }) {
++    TestCodec(compression);
++  }
++
++  assert(arrow::util::Codec::Create(arrow::Compression::BZ2).ok());
++  RoundTrip(arrow::Compression::LZ4_FRAME);
++  RoundTrip(arrow::Compression::ZSTD);
++
++  assert(arrow::compute::Initialize().ok());
++  arrow::Int64Builder builder;
++  assert(builder.AppendValues({1, 2, 3}).ok());
++  std::shared_ptr<arrow::Array> values;
++  assert(builder.Finish(&values).ok());
++  auto added = arrow::compute::CallFunction(
++      "add", {arrow::Datum(values), arrow::Datum(arrow::MakeScalar(std::int64_t{1}))});
++  assert(added.ok());
++  assert(added->make_array()->length() == 3);
++
++  auto schema = arrow::schema({arrow::field("value", arrow::int64())});
++  auto batch = arrow::RecordBatch::Make(schema, 3, {values});
++  arrow::dataset::InMemoryDataset dataset(schema, {batch});
++  assert(dataset.schema()->Equals(*schema));
++  ParquetRoundTrip(schema, values);
++
++  auto location = arrow::flight::Location::ForGrpcTcp("localhost", 31337);
++  assert(location.ok());
++
++  arrow::MemoryPool* pool = nullptr;
++
++
++  assert(arrow::mimalloc_memory_pool(&pool).ok());
++  assert(pool != nullptr);
++  return 0;
++}

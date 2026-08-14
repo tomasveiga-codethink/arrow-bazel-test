@@ -70,3 +70,185 @@ diff --git a/cpp/src/arrow/util/compression_snappy.cc b/cpp/src/arrow/util/compr
  
  #include "arrow/result.h"
  #include "arrow/status.h"
+diff -ruN cpp-orig/src/arrow/engine/substrait/expression_internal.cc cpp/src/arrow/engine/substrait/expression_internal.cc
+--- a/cpp/src/arrow/engine/substrait/expression_internal.cc	2026-08-14 12:47:07.603204675 +0100
++++ b/cpp/src/arrow/engine/substrait/expression_internal.cc	2026-08-14 16:34:20.687400510 +0100
+@@ -32,8 +32,8 @@
+ #include <utility>
+ #include <vector>
+ 
+-#include <google/protobuf/descriptor.h>
+-#include <google/protobuf/wrappers.pb.h>
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/wrappers.pb.h"
+ 
+ #include "arrow/array/array_base.h"
+ #include "arrow/array/array_nested.h"
+diff -ruN cpp-orig/src/arrow/engine/substrait/options.cc cpp/src/arrow/engine/substrait/options.cc
+--- a/cpp/src/arrow/engine/substrait/options.cc	2026-08-14 12:47:07.606204753 +0100
++++ b/cpp/src/arrow/engine/substrait/options.cc	2026-08-14 16:34:20.686400480 +0100
+@@ -17,7 +17,7 @@
+ 
+ #include "arrow/engine/substrait/options.h"
+ 
+-#include <google/protobuf/util/json_util.h>
++#include "google/protobuf/util/json_util.h"
+ #include <mutex>
+ 
+ #include "arrow/acero/aggregate_node.h"
+diff -ruN cpp-orig/src/arrow/engine/substrait/protobuf_test_util.cc cpp/src/arrow/engine/substrait/protobuf_test_util.cc
+--- a/cpp/src/arrow/engine/substrait/protobuf_test_util.cc	2026-08-14 12:47:07.607204778 +0100
++++ b/cpp/src/arrow/engine/substrait/protobuf_test_util.cc	2026-08-14 16:34:20.686400480 +0100
+@@ -17,8 +17,8 @@
+ 
+ #include <gtest/gtest.h>
+ 
+-#include <google/protobuf/message_lite.h>
+-#include <google/protobuf/stubs/common.h>
++#include "google/protobuf/message_lite.h"
++#include "google/protobuf/stubs/common.h"
+ 
+ namespace arrow {
+ namespace engine {
+diff -ruN cpp-orig/src/arrow/engine/substrait/serde.cc cpp/src/arrow/engine/substrait/serde.cc
+--- a/cpp/src/arrow/engine/substrait/serde.cc	2026-08-14 12:47:07.608204804 +0100
++++ b/cpp/src/arrow/engine/substrait/serde.cc	2026-08-14 16:34:20.686400480 +0100
+@@ -21,13 +21,13 @@
+ #include <type_traits>
+ #include <utility>
+ 
+-#include <google/protobuf/descriptor.h>
+-#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
+-#include <google/protobuf/message.h>
+-#include <google/protobuf/util/json_util.h>
+-#include <google/protobuf/util/message_differencer.h>
+-#include <google/protobuf/util/type_resolver.h>
+-#include <google/protobuf/util/type_resolver_util.h>
++#include "google/protobuf/descriptor.h"
++#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
++#include "google/protobuf/message.h"
++#include "google/protobuf/util/json_util.h"
++#include "google/protobuf/util/message_differencer.h"
++#include "google/protobuf/util/type_resolver.h"
++#include "google/protobuf/util/type_resolver_util.h"
+ 
+ #include "arrow/acero/exec_plan.h"
+ #include "arrow/acero/options.h"
+diff -ruN cpp-orig/src/arrow/filesystem/gcsfs.cc cpp/src/arrow/filesystem/gcsfs.cc
+--- a/cpp/src/arrow/filesystem/gcsfs.cc	2026-08-14 12:47:07.617205036 +0100
++++ b/cpp/src/arrow/filesystem/gcsfs.cc	2026-08-14 16:34:20.687400510 +0100
+@@ -20,7 +20,7 @@
+ #include <algorithm>
+ #include <chrono>
+ 
+-#include <google/cloud/storage/client.h>
++#include "google/cloud/storage/client.h"
+ 
+ #include "arrow/buffer.h"
+ #include "arrow/filesystem/gcsfs_internal.h"
+diff -ruN cpp-orig/src/arrow/filesystem/gcsfs_internal.h cpp/src/arrow/filesystem/gcsfs_internal.h
+--- a/cpp/src/arrow/filesystem/gcsfs_internal.h	2026-08-14 12:47:07.617205036 +0100
++++ b/cpp/src/arrow/filesystem/gcsfs_internal.h	2026-08-14 16:34:20.687400510 +0100
+@@ -21,13 +21,13 @@
+ #include <string>
+ #include <vector>
+ 
+-#include <google/cloud/credentials.h>
+-#include <google/cloud/options.h>
+-#include <google/cloud/status.h>
+-#include <google/cloud/storage/client.h>
+-#include <google/cloud/storage/object_metadata.h>
+-#include <google/cloud/storage/well_known_headers.h>
+-#include <google/cloud/storage/well_known_parameters.h>
++#include "google/cloud/credentials.h"
++#include "google/cloud/options.h"
++#include "google/cloud/status.h"
++#include "google/cloud/storage/client.h"
++#include "google/cloud/storage/object_metadata.h"
++#include "google/cloud/storage/well_known_headers.h"
++#include "google/cloud/storage/well_known_parameters.h"
+ 
+ #include "arrow/filesystem/filesystem.h"
+ 
+diff -ruN cpp-orig/src/arrow/filesystem/gcsfs_test.cc cpp/src/arrow/filesystem/gcsfs_test.cc
+--- a/cpp/src/arrow/filesystem/gcsfs_test.cc	2026-08-14 12:47:07.618205061 +0100
++++ b/cpp/src/arrow/filesystem/gcsfs_test.cc	2026-08-14 16:34:20.687400510 +0100
+@@ -20,9 +20,9 @@
+ #include <absl/time/time.h>
+ #include <gmock/gmock-matchers.h>
+ #include <gmock/gmock-more-matchers.h>
+-#include <google/cloud/credentials.h>
+-#include <google/cloud/storage/client.h>
+-#include <google/cloud/storage/options.h>
++#include "google/cloud/credentials.h"
++#include "google/cloud/storage/client.h"
++#include "google/cloud/storage/options.h"
+ #include <gtest/gtest.h>
+ 
+ #include <random>
+diff -ruN cpp-orig/src/arrow/flight/serialization_internal.cc cpp/src/arrow/flight/serialization_internal.cc
+--- a/cpp/src/arrow/flight/serialization_internal.cc	2026-08-14 12:47:07.628205319 +0100
++++ b/cpp/src/arrow/flight/serialization_internal.cc	2026-08-14 16:34:20.688400540 +0100
+@@ -21,10 +21,10 @@
+ #include <memory>
+ #include <string>
+ 
+-#include <google/protobuf/any.pb.h>
+-#include <google/protobuf/io/coded_stream.h>
+-#include <google/protobuf/io/zero_copy_stream_impl_lite.h>
+-#include <google/protobuf/wire_format_lite.h>
++#include "google/protobuf/any.pb.h"
++#include "google/protobuf/io/coded_stream.h"
++#include "google/protobuf/io/zero_copy_stream_impl_lite.h"
++#include "google/protobuf/wire_format_lite.h"
+ 
+ #include "arrow/buffer.h"
+ #include "arrow/flight/protocol_internal.h"
+diff -ruN cpp-orig/src/arrow/flight/sql/client.cc cpp/src/arrow/flight/sql/client.cc
+--- a/cpp/src/arrow/flight/sql/client.cc	2026-08-14 12:47:07.630205370 +0100
++++ b/cpp/src/arrow/flight/sql/client.cc	2026-08-14 16:34:20.688400540 +0100
+@@ -21,7 +21,7 @@
+ 
+ #include "arrow/flight/sql/client.h"
+ 
+-#include <google/protobuf/any.pb.h>
++#include "google/protobuf/any.pb.h"
+ 
+ #include "arrow/buffer.h"
+ #include "arrow/flight/serialization_internal.h"
+diff -ruN cpp-orig/src/arrow/flight/sql/server.cc cpp/src/arrow/flight/sql/server.cc
+--- a/cpp/src/arrow/flight/sql/server.cc	2026-08-14 12:47:07.656206039 +0100
++++ b/cpp/src/arrow/flight/sql/server.cc	2026-08-14 16:34:20.688400540 +0100
+@@ -22,7 +22,7 @@
+ 
+ #include "arrow/flight/sql/server.h"
+ 
+-#include <google/protobuf/any.pb.h>
++#include "google/protobuf/any.pb.h"
+ 
+ #include "arrow/buffer.h"
+ #include "arrow/builder.h"
+diff -ruN cpp-orig/src/arrow/telemetry/logging.cc cpp/src/arrow/telemetry/logging.cc
+--- a/cpp/src/arrow/telemetry/logging.cc	2026-08-14 12:47:07.699207146 +0100
++++ b/cpp/src/arrow/telemetry/logging.cc	2026-08-14 16:34:20.688400540 +0100
+@@ -25,7 +25,7 @@
+ #  pragma warning(disable : 4522)
+ #endif
+ 
+-#include <google/protobuf/util/json_util.h>
++#include "google/protobuf/util/json_util.h"
+ 
+ #include <opentelemetry/exporters/ostream/log_record_exporter.h>
+ #include <opentelemetry/exporters/otlp/otlp_http_log_record_exporter.h>
+diff -ruN cpp-orig/src/arrow/util/tracing_internal.cc cpp/src/arrow/util/tracing_internal.cc
+--- a/cpp/src/arrow/util/tracing_internal.cc	2026-08-14 12:47:07.734208046 +0100
++++ b/cpp/src/arrow/util/tracing_internal.cc	2026-08-14 16:34:20.688400540 +0100
+@@ -29,7 +29,7 @@
+ #  pragma warning(push)
+ #  pragma warning(disable : 4522)
+ #endif
+-#include <google/protobuf/util/json_util.h>
++#include "google/protobuf/util/json_util.h"
+ 
+ #include <opentelemetry/exporters/ostream/span_exporter.h>
+ #include <opentelemetry/exporters/otlp/otlp_http_exporter.h>

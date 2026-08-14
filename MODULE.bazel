@@ -6,6 +6,7 @@ module(
 bazel_dep(name = "abseil-cpp", version = "20260526.0")
 bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aspect_rules_esbuild", version = "0.27.0")
+bazel_dep(name = "azure-core-cpp", version = "1.14.1.bcr.2")
 bazel_dep(name = "bazel_lib", version = "3.7.1")
 bazel_dep(name = "boost.system", version = "1.90.0.bcr.1")
 bazel_dep(name = "boost.multiprecision", version = "1.90.0.bcr.1")
@@ -13,6 +14,7 @@ bazel_dep(name = "brotli", version = "1.2.0.bcr.1")
 bazel_dep(name = "bzip2", version = "1.0.8.bcr.4")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "glog", version = "0.7.1.bcr.1")
+bazel_dep(name = "google_cloud_cpp", version = "3.8.0")
 bazel_dep(name = "grpc", version = "1.83.0")
 bazel_dep(name = "lz4", version = "1.10.0.bcr.1")
 bazel_dep(name = "mimalloc", version = "2.2.4.bcr.2")
@@ -44,9 +46,11 @@ git_repository(
     build_file = "//bazel/build_files:arrow.bazel",
     commit = "c44eca6892364e58489fe564f910c0e1c1c6cb6b",
     patch_strip = 1,
+    patch_tool = "patch",
     patches = [
         "//bazel/patches:constants.patch",
         "//bazel/patches:arrow-includes.patch",
+        "//bazel/patches:test.patch",
     ],  # see comment at the bottom
     remote = "https://github.com/apache/arrow.git",
 )
@@ -64,6 +68,16 @@ single_version_override(
     patch_cmds = [
         "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' BUILD",
         "sed -i '$a\\bazel_dep(name = \"rules_cc\", version = \"0.2.19\")' MODULE.bazel",
+    ],
+)
+
+single_version_override(
+    module_name = "google_cloud_cpp",
+    patch_cmds = [
+        "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' google/cloud/storage/BUILD.bazel",
+        "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' google/cloud/BUILD.bazel",
+        "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' BUILD.bazel",
+        "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' google/cloud/opentelemetry/BUILD.bazel",
     ],
 )
 
