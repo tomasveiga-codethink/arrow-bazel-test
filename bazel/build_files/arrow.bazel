@@ -1001,6 +1001,7 @@ cc_library(
         "@utf8proc//:utf8proc",
         "@zlib//:zlib",
         "@zstd//:zstd",
+        "@boost.multiprecision",
     ] + select({
         "@platforms//cpu:x86_64": [
             ":arrow_core_avx2",
