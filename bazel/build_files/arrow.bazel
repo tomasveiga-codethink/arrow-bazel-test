@@ -16,8 +16,6 @@ load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load("@protobuf//bazel:cc_proto_library.bzl", "cc_proto_library")
 load("@rules_proto//proto:defs.bzl", "proto_library")
 
-package(default_visibility = ["//visibility:public"])
-
 licenses(["notice"])  # Apache-2.0
 
 exports_files([
@@ -119,31 +117,31 @@ flatbuffer_cc_library(
 genrule(
     name = "flight_pb",
     outs = ["cpp/src/arrow/flight/Flight.pb.h"],
-    cmd = """echo '#include "arrow/format/Flight.pb.h"' > $@""",
+    cmd = """echo '#include "format/Flight.pb.h"' > $@""",
 )
 
 genrule(
     name = "flight_grpc_h",
     outs = ["cpp/src/arrow/flight/Flight.grpc.pb.h"],
-    cmd = """echo '#include "arrow/format/Flight.grpc.pb.h"' > $@""",
+    cmd = """echo '#include "format/Flight.grpc.pb.h"' > $@""",
 )
 
 genrule(
     name = "flight_grpc_cc",
     outs = ["cpp/src/arrow/flight/Flight.grpc.pb.cc"],
-    cmd = """echo '#include "arrow/format/Flight.grpc.pb.cc"' > $@""",
+    cmd = """echo '#include "format/Flight.grpc.pb.cc"' > $@""",
 )
 
 genrule(
     name = "flight_sql_cc",
     outs = ["cpp/src/arrow/flight/sql/FlightSql.pb.cc"],
-    cmd = """echo '#include "arrow/format/FlightSql.pb.cc"' > $@""",
+    cmd = """echo '#include "format/FlightSql.pb.cc"' > $@""",
 )
 
 genrule(
     name = "flight_sql_h",
     outs = ["cpp/src/arrow/flight/sql/FlightSql.pb.h"],
-    cmd = """echo '#include "arrow/format/FlightSql.pb.h"' > $@""",
+    cmd = """echo '#include "format/FlightSql.pb.h"' > $@""",
 )
 
 _ARROW_SRCS = [
@@ -693,6 +691,8 @@ cc_library(
         ":flight_cc_proto",
         "@grpc//:grpc++",
         "@protobuf//:protobuf",
+        "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 
@@ -1127,6 +1127,7 @@ cc_library(
         "@grpc//:grpc++",
         "@protobuf//:protobuf",
         "@abseil-cpp//absl/status:status",
+        "@abseil-cpp//absl/status:statusor",
     ],
 )
 

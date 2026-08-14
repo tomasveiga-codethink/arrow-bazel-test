@@ -39,6 +39,8 @@ git_repository(
     name = "arrow",
     remote = "https://github.com/apache/arrow.git",
     commit = "c44eca6892364e58489fe564f910c0e1c1c6cb6b",
+    patches = ["//bazel/patches:arrow-includes.patch"], # see comment at the bottom
+    patch_strip = 1,
     build_file = "//bazel/build_files:arrow.bazel",
 )
 
@@ -57,3 +59,11 @@ single_version_override(
         "sed -i '$a\\bazel_dep(name = \"rules_cc\", version = \"0.2.19\")' MODULE.bazel",
     ],
 )
+
+# Includes in Bazel are tricky.
+# bazel passes -iquote to gcc for the external repos expecting the headers to be included between ",
+# arrow, however, includes several headers with <> (like snappy, re2, absl, utf8proc)
+# we can fix this in one of three ways:
+#  - patch these modules' build files adding `includes = ["."]` - for absl it's not this simple because of how that module is organised
+#  - change arrow source code replacing < with " - found examples in BCR: https://github.com/bazelbuild/bazel-central-registry/blob/main/modules/mujoco/3.10.0/patches/use_bzlmod_dependency_includes.patch
+#  - build with `--features=external_include_paths` - this seems to slow down the build and has to be passed in cli or .bazelrc
