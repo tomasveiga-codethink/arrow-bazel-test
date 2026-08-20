@@ -14,6 +14,7 @@ bazel_dep(name = "brotli", version = "1.2.0.bcr.1")
 bazel_dep(name = "bzip2", version = "1.0.8.bcr.4")
 bazel_dep(name = "flatbuffers", version = "25.12.19")
 bazel_dep(name = "glog", version = "0.7.1.bcr.1")
+bazel_dep(name = "googleapis", version = "0.0.0-20260812-f76fc6dc")
 bazel_dep(name = "google_cloud_cpp", version = "3.8.0")
 bazel_dep(name = "grpc", version = "1.83.0")
 bazel_dep(name = "lz4", version = "1.10.0.bcr.1")
@@ -46,7 +47,7 @@ git_repository(
     build_file = "//bazel/build_files:arrow.bazel",
     commit = "c44eca6892364e58489fe564f910c0e1c1c6cb6b",
     patch_strip = 1,
-    patch_tool = "patch",
+    # patch_tool = "patch",
     patches = [
         "//bazel/patches:constants.patch",
         "//bazel/patches:arrow-includes.patch",
@@ -78,7 +79,18 @@ single_version_override(
         "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' google/cloud/BUILD.bazel",
         "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' BUILD.bazel",
         "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_binary\", \"cc_library\", \"cc_test\")' google/cloud/opentelemetry/BUILD.bazel",
+        "sed -i '1i\\load(\"@rules_cc//cc:defs.bzl\", \"cc_library\", \"cc_test\")' bazel/gapic.bzl",
+        "sed -i -e 's/native.cc_library/cc_library/g' bazel/gapic.bzl",
+        "sed -i -e 's/native.cc_test/cc_test/g' bazel/gapic.bzl",
     ],
+)
+
+single_version_override(
+    module_name = "googleapis",
+    patch_cmds = [
+        "sed -i '/bazel_dep(name = \"googleapis-rules-registry\", version = \"1.1.5\")/a bazel_dep(name = \"rules_python\", version = \"3.3.1\")' MODULE.bazel",
+        "sed -i '1i\\load(\"@rules_python//python:py_test.bzl\", \"py_test\")' google/storage/v2/BUILD.bazel",
+    ]
 )
 
 # Includes in Bazel are tricky.

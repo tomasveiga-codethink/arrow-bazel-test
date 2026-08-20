@@ -1,0 +1,11 @@
+--- a/cpp/src/arrow/filesystem/gcsfs.cc	2026-08-14 16:26:41.868490877 +0100
++++ b/cpp/src/arrow/filesystem/gcsfs.cc	2026-08-14 16:27:10.911238096 +0100
+@@ -20,7 +20,7 @@
+ #include <algorithm>
+ #include <chrono>
+ 
+-#include <google/cloud/storage/client.h>
++#include "google/cloud/storage/client.h"
+ 
+ #include "arrow/buffer.h"
+ #include "arrow/filesystem/gcsfs_internal.h"
